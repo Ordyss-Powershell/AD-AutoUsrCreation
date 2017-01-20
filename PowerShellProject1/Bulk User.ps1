@@ -15,6 +15,8 @@ New-ADUser -server $server -SamAccountName $_.SAMAccountName -name $_.DisplayNam
 Set-ADAccountPassword -server $server -Identity $_.SAMAccountName -Reset -NewPassword (ConvertTo-SecureString –String $_.AccountPassword -AsPlainText -Force)
 }
 
+#Add to Groups Section
+
 $addgroup = Read-host "Do these users require to be added to groups? y/n"
 
  If ($addgroup -eq 'y') {
@@ -54,6 +56,7 @@ else {
 Write-host "Skipping Group Section"
 }
 
+#Mailbox Creation Section
 $createmailbox = Write-Host "Does user require a mailbox? y/n"
 
 If ($createmailbox -eq 'y'){
@@ -64,14 +67,41 @@ import-csv $path |foreach {
 Enable-Mailbox $_.UserPrincipalName
 }
 Remove-PSSession $localexchnagesession
+
+#Office 365 Move
+
 $O365mailbox = Read-Host "Do you use O365? y/n"
+
 If ($o365mailbox -eq 'y'){
 #Credentials to login servers
 $O365CREDS = Get-Credential -Message "O365 Crednetials"
 $ONPREMCREDS = Get-Credential -Message "On Premise Credentials"
 
+#Dirsync
+$DirsyncSever = Read-Host "Please specify your Dirsync server"
+Invoke-Command -ComputerName $DirsyncSever -ScriptBlock { 
+Import-Module dirsync;Write-Host "Importing Dirsync Module on $(hostname)" -ForegroundColor Cyan
+Start-OnlineCoexistenceSync;Write-Host "Starting Online Coexistence Sync (dirsync) on $(hostname)" -ForegroundColor Cyan
+}
+
+
 #Connect to O365
 Connect-MsolService -Credential $O365CREDS
+
+#Check if user is in O365
+[:Check_User]
+do {
+Import-Csv $path | foreach {
+Get-MsolUser -UserPrincipalName $_.UserprincipalName
+} 
+
+
+#Dirsync
+Invoke-Command -ComputerName $DirsyncSever -ScriptBlock { 
+Import-Module dirsync;Write-Host "Importing Dirsync Module on $(hostname)" -ForegroundColor Cyan
+Start-OnlineCoexistenceSync;Write-Host "Starting Online Coexistence Sync (dirsync) on $(hostname)" -ForegroundColor Cyan
+}
+} while {"Does not exist"}
 
 #Import Exchange Module
 $O365SESSION = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $O365CREDS -Authentication Basic -AllowRedirection
@@ -105,6 +135,9 @@ New-MoveRequest -Identity $_.UserPrincipalName -Remote -RemoteHostName $remoteho
 else {
 Write-Host "Skipping O365 Export"
 }
+}
 else {
 Write-Host "Skipping Mailbox Creation"
 }
+
+
