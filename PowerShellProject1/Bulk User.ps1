@@ -28,8 +28,8 @@ $addgroup = Read-host "Do these users require to be added to groups? y/n"
  s/d/c/m
  "
 If ($addinggroups -eq 'd' ){
-$path = Get-File -initialDirectory “c:\"
-import-csv $path |foreach {
+$path2 = Get-File -initialDirectory “c:\"
+import-csv $path2 |foreach {
 Add-ADGroupMember -Identity $_.group -Members $_.SAMAccountName
 }
 }
